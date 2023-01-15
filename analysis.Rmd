@@ -49,10 +49,10 @@ Each participant completes the same number of tasks, see that the min and max nu
 
 ```{r data-part1}
 knitr::kable(part_and_task_info %>%
-			 	group_by(participant_ID) %>%
-			 	summarise(n_tasks_per_i = n()) %>%
-			 	summarise(min_n_tasks = min(n_tasks_per_i),
-			 			  max_n_tasks = max(n_tasks_per_i)))
+		 	group_by(participant_ID) %>%
+		 	summarise(n_tasks_per_i = n()) %>%
+		 	summarise(min_n_tasks = min(n_tasks_per_i),
+		 		    max_n_tasks = max(n_tasks_per_i)))
 ```
 
 Not all tasks provide an opportunity to cheat. For some tasks, participants had to use a mouse to indicate the differences between pictures, so there was no opportunity to say "Yes, I found all 3 differences" without showing them. 
@@ -60,11 +60,11 @@ All participants complete the same number of **click tasks**, see that the min a
 
 ```{r}
 knitr::kable(part_and_task_info %>% 
-			 	filter(type_of_task == "click") %>%
-			 	group_by(participant_ID) %>%
-			 	summarise(n_tasks_per_i = n()) %>%
-			 	summarise(min_n_tasks = min(n_tasks_per_i),
-			 			  max_n_tasks = max(n_tasks_per_i)))
+		 	filter(type_of_task == "click") %>%
+		 	group_by(participant_ID) %>%
+		 	summarise(n_tasks_per_i = n()) %>%
+		 	summarise(min_n_tasks = min(n_tasks_per_i),
+		 		    max_n_tasks = max(n_tasks_per_i)))
 
 ```
 
@@ -72,12 +72,12 @@ For no-click tasks, the split between trials with 1, 2, or 3 differences is:
 
 ```{r}
 knitr::kable(part_and_task_info %>% 
-			 	filter(type_of_task == "noclick") %>% 
-			 	group_by(n_differences) %>%
-			 	summarise(n_tasks = n()) %>%
-			 	ungroup() %>%
-			 	mutate(perc_tasks = n_tasks / sum(n_tasks)),
-			 digits = 2)
+		 	filter(type_of_task == "noclick") %>% 
+		 	group_by(n_differences) %>%
+		 	summarise(n_tasks = n()) %>%
+		 	ungroup() %>%
+		 	mutate(perc_tasks = n_tasks / sum(n_tasks)),
+		 digits = 2)
 
 ```
 
@@ -85,12 +85,12 @@ For no-click tasks, the split by reward:
 
 ```{r}
 knitr::kable(part_and_task_info %>% 
-			 	filter(type_of_task == "noclick") %>% 
-			 	group_by(reward) %>%
-			 	summarise(n_tasks = n()) %>%
-			 	ungroup() %>%
-			 	mutate(perc_tasks = n_tasks / sum(n_tasks)),
-			 digits = 2)
+		 	filter(type_of_task == "noclick") %>% 
+		 	group_by(reward) %>%
+		 	summarise(n_tasks = n()) %>%
+		 	ungroup() %>%
+		 	mutate(perc_tasks = n_tasks / sum(n_tasks)),
+		 digits = 2)
 
 ```
 
@@ -122,15 +122,15 @@ top_10perc    <- quantile(df_plot$std_perc_cheating, probs = c(0.90))
 
 df_plot <- df_plot %>%
 	mutate(is_between_bottom_top_10perc = 
-		   	(std_perc_cheating >= bottom_10perc)*
-		   	(std_perc_cheating <= top_10perc))
+		 	(std_perc_cheating >= bottom_10perc)*
+		 	(std_perc_cheating <= top_10perc))
 
 df_plot <- df_plot %>%
 	arrange(perc_cheating) %>%
 	mutate(cheat_number = row_number()) %>%
 	mutate(f_fill = factor(is_between_bottom_top_10perc,
-						   levels = c(0, 1),
-						   labels = c("bottom", "middle")))
+				     levels = c(0, 1),
+				     labels = c("bottom", "middle")))
 
 df_plot %>% 
 	ggplot(aes(x = cheat_number, y = perc_cheating)) +
@@ -140,11 +140,11 @@ df_plot %>%
 	xlab("Participant") +
 	scale_x_continuous(breaks = c(1, 60, 120)) + 
 	scale_fill_manual("", 
-					  breaks = c("bottom", "middle"),
-					  values = c("middle" = "blue", # "#00A9FF"
-					  		   "bottom" = "grey50"),
-					  labels = c("bottom" = "Bottom 10% and top 10%",
-					  		   "middle" = "Analysis sample (n = 97)")) +
+				breaks = c("bottom", "middle"),
+				values = c("middle" = "blue", # "#00A9FF"
+					     "bottom" = "grey50"),
+				labels = c("bottom" = "Bottom 10% and top 10%",
+					     "middle" = "Analysis sample (n = 97)")) +
 	guides(fill = guide_legend(nrow = 2)) +
 	theme(legend.position = "bottom") 
 
@@ -159,7 +159,7 @@ df_plot %>%
 	mutate(group_name = if_else(std_perc_cheating < 0, "bottom_10", "top_10")) %>%
 	group_by(group_name) %>%
 	summarise(n_obs = n(),
-			  mean_perc_cheating = mean(perc_cheating)) 
+		    mean_perc_cheating = mean(perc_cheating)) 
 
 ```
 
@@ -169,15 +169,15 @@ df_plot %>%
 
 ```{r WO_top10_bottom10}
 WO_top10_bottom10_stan_data <- f_prep_stan_data(part_info = part_info, 
-												part_and_task_info = part_and_task_info,
-												exclusion_C1 = "no_exclusion", 
-												exclusion_C2 = "top_bottom_10")
+								part_and_task_info = part_and_task_info,
+								exclusion_C1 = "no_exclusion", 
+								exclusion_C2 = "top_bottom_10")
 WO_top10_bottom10_choice_fit <- sampling(choice_model, 
-										 data = WO_top10_bottom10_stan_data,
-										 chains = 2, 
-										 iter = 2000, 
-										 seed = 25,
-										 save_warmup = FALSE)
+						     data = WO_top10_bottom10_stan_data,
+						     chains = 2, 
+						     iter = 2000, 
+						     seed = 25,
+						     save_warmup = FALSE)
 ```
 
 `Rhat` values for this model:
@@ -192,19 +192,19 @@ Estimation results are:
 
 ```{r}
 knitr::kable(f_sum_results(par_names = choice_pars, 
-						   stan_fit = WO_top10_bottom10_choice_fit), 
-			 digits = 2)
+				   stan_fit = WO_top10_bottom10_choice_fit), 
+		 digits = 2)
 ```
 
 Interaction plot:
 
 ```{r}
 f_plot_interaction(choice_fit = WO_top10_bottom10_choice_fit, 
-				   choice_pars = choice_pars, 
-				   grid_std_cheating = seq(
-				   	from = floor(min(WO_top10_bottom10_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-				   	to = ceiling(max(WO_top10_bottom10_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-				   	by = 0.01))
+			 choice_pars = choice_pars, 
+			 grid_std_cheating = seq(
+			 	from = floor(min(WO_top10_bottom10_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+			 	to = ceiling(max(WO_top10_bottom10_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+			 	by = 0.01))
 
 ```
 
@@ -215,15 +215,15 @@ f_plot_interaction(choice_fit = WO_top10_bottom10_choice_fit,
 
 ```{r allN}
 allN_stan_data <- f_prep_stan_data(part_info = part_info, 
-								   part_and_task_info = part_and_task_info,
-								   exclusion_C1 = "no_exclusion", 
-								   exclusion_C2 = "no_exclusion")
+					     part_and_task_info = part_and_task_info,
+					     exclusion_C1 = "no_exclusion", 
+					     exclusion_C2 = "no_exclusion")
 allN_choice_fit <- sampling(choice_model, 
-							data = allN_stan_data,
-							chains = 2, 
-							iter = 2000, 
-							seed = 25,
-							save_warmup = FALSE)
+				    data = allN_stan_data,
+				    chains = 2, 
+				    iter = 2000, 
+				    seed = 25,
+				    save_warmup = FALSE)
 ```
 
 `Rhat` values for this model:
@@ -238,19 +238,19 @@ Estimation results are:
 
 ```{r}
 knitr::kable(f_sum_results(par_names = choice_pars, 
-							  stan_fit = allN_choice_fit), 
-			 digits = 2)
+				   stan_fit = allN_choice_fit), 
+		 digits = 2)
 ```
 
 Interaction plot:
 
 ```{r }
 f_plot_interaction(choice_fit = allN_choice_fit, 
-				   choice_pars = choice_pars, 
-				   grid_std_cheating = seq(
-				   	from = floor(min(allN_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-				   	to = ceiling(max(allN_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-				   	by = 0.01))
+			 choice_pars = choice_pars, 
+			 grid_std_cheating = seq(
+			 	from = floor(min(allN_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+			 	to = ceiling(max(allN_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+			 	by = 0.01))
 
 ```
 
@@ -259,16 +259,16 @@ f_plot_interaction(choice_fit = allN_choice_fit,
 
 ```{r WO_top5_bottom5}
 WO_top5_bottom5_stan_data <- f_prep_stan_data(part_info = part_info, 
-											  part_and_task_info = part_and_task_info,
-											  exclusion_C1 = "no_exclusion", 
-											  exclusion_C2 = "top_bottom_5")
+							    part_and_task_info = part_and_task_info,
+							    exclusion_C1 = "no_exclusion", 
+							    exclusion_C2 = "top_bottom_5")
 
 WO_top5_bottom5_choice_fit <- sampling(choice_model, 
-									   data = WO_top5_bottom5_stan_data,
-									   chains = 2, 
-									   iter = 2000, 
-									   seed = 25,
-									   save_warmup = FALSE)
+						   data = WO_top5_bottom5_stan_data,
+						   chains = 2, 
+						   iter = 2000, 
+						   seed = 25,
+						   save_warmup = FALSE)
 ```
 
 `Rhat` values for this model:
@@ -283,19 +283,19 @@ Estimation results are:
 
 ```{r }
 knitr::kable(f_sum_results(par_names = choice_pars, 
-						   stan_fit = WO_top5_bottom5_choice_fit), 
-			 digits = 2)
+				   stan_fit = WO_top5_bottom5_choice_fit), 
+		 digits = 2)
 ```
 
 Interaction plot:
 
 ```{r }
 f_plot_interaction(choice_fit = WO_top5_bottom5_choice_fit, 
-				   choice_pars = choice_pars, 
-				   grid_std_cheating = seq(
-				   	from = floor(min(WO_top5_bottom5_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-				   	to = ceiling(max(WO_top5_bottom5_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-				   	by = 0.01))
+			 choice_pars = choice_pars, 
+			 grid_std_cheating = seq(
+			 	from = floor(min(WO_top5_bottom5_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+			 	to = ceiling(max(WO_top5_bottom5_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+			 	by = 0.01))
 
 ```
 
@@ -305,16 +305,16 @@ f_plot_interaction(choice_fit = WO_top5_bottom5_choice_fit,
 
 ```{r WO_top15_bottom15}
 WO_top15_bottom15_stan_data <- f_prep_stan_data(part_info = part_info, 
-												part_and_task_info = part_and_task_info,
-												exclusion_C1 = "no_exclusion", 
-												exclusion_C2 = "top_bottom_15")
+								part_and_task_info = part_and_task_info,
+								exclusion_C1 = "no_exclusion", 
+								exclusion_C2 = "top_bottom_15")
 
 WO_top15_bottom15_choice_fit <- sampling(choice_model, 
-										 data = WO_top15_bottom15_stan_data,
-										 chains = 2, 
-										 iter = 2000, 
-										 seed = 25,
-										 save_warmup = FALSE)
+						     data = WO_top15_bottom15_stan_data,
+						     chains = 2, 
+						     iter = 2000, 
+						     seed = 25,
+						     save_warmup = FALSE)
 ```
 
 `Rhat` values for this model:
@@ -329,19 +329,19 @@ Estimation results are:
 
 ```{r }
 knitr::kable(f_sum_results(par_names = choice_pars, 
-						   stan_fit = WO_top15_bottom15_choice_fit), 
-			 digits = 2)
+				   stan_fit = WO_top15_bottom15_choice_fit), 
+		 digits = 2)
 ```
 
 Interaction plot:
 
 ```{r }
 f_plot_interaction(choice_fit = WO_top15_bottom15_choice_fit, 
-				   choice_pars = choice_pars, 
-				   grid_std_cheating = seq(
-				   	from = floor(min(WO_top15_bottom15_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-				   	to = ceiling(max(WO_top15_bottom15_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-				   	by = 0.01))
+			 choice_pars = choice_pars, 
+			 grid_std_cheating = seq(
+			 	from = floor(min(WO_top15_bottom15_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+			 	to = ceiling(max(WO_top15_bottom15_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+			 	by = 0.01))
 
 ```
 
@@ -349,16 +349,16 @@ f_plot_interaction(choice_fit = WO_top15_bottom15_choice_fit,
 
 ```{r WO_Hand_out}
 WO_Hand_out_stan_data <- f_prep_stan_data(part_info = part_info, 
-										  part_and_task_info = part_and_task_info,
-										  exclusion_C1 = "Hand_out", 
-										  exclusion_C2 = "no_exclusion")
+							part_and_task_info = part_and_task_info,
+							exclusion_C1 = "Hand_out", 
+							exclusion_C2 = "no_exclusion")
 
 WO_Hand_out_choice_fit <- sampling(choice_model, 
-								   data = WO_Hand_out_stan_data,
-								   chains = 2, 
-								   iter = 2000, 
-								   seed = 25,
-								   save_warmup = FALSE)
+					     data = WO_Hand_out_stan_data,
+					     chains = 2, 
+					     iter = 2000, 
+					     seed = 25,
+					     save_warmup = FALSE)
 ```
 
 `Rhat` values for this model:
@@ -373,19 +373,19 @@ Estimation results are:
 
 ```{r }
 knitr::kable(f_sum_results(par_names = choice_pars, 
-						   stan_fit = WO_Hand_out_choice_fit), 
-			 digits = 2)
+				   stan_fit = WO_Hand_out_choice_fit), 
+		 digits = 2)
 ```
 
 Interaction plot:
 
 ```{r }
 f_plot_interaction(choice_fit = WO_Hand_out_choice_fit, 
-				   choice_pars = choice_pars, 
-				   grid_std_cheating = seq(
-				   	from = floor(min(WO_Hand_out_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-				   	to = ceiling(max(WO_Hand_out_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-				   	by = 0.01))
+			 choice_pars = choice_pars, 
+			 grid_std_cheating = seq(
+			 	from = floor(min(WO_Hand_out_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+			 	to = ceiling(max(WO_Hand_out_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+			 	by = 0.01))
 
 ```
 
