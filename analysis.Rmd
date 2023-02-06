@@ -21,17 +21,22 @@ This file includes the analysis for "The effect of acute stress on dishonesty: t
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r packages-and-data}
-
+```{r packages, include=FALSE}
 library("tidyverse")
 library("rstan")
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())	
+choice_model <- stan_model(here::here("LOGIT.stan"))
+```
 
+
+```{r }
 load(here::here("data.RData"))
 source(here::here("f_aux_functions.R"))
-choice_model <- stan_model(here::here("LOGIT.stan"))
 choice_pars <- c("gamma_00", "gamma_std_cheat", "gamma_stress", "gamma_std_cheat_stress")
+
+n_chains <- 10
+n_iter   <- 10000
 
 ```
 
@@ -68,6 +73,23 @@ knitr::kable(part_and_task_info %>%
 
 ```
 
+For click trials, each participant had exactly 6 normal trials (reward of 5 cents), 3 hard trials (reward of 20 cents), and 3 very hard trials (reward of 40 cents):
+
+```{r}
+
+knitr::kable(part_and_task_info %>% 
+		 	filter(type_of_task == "click") %>%
+		 	group_by(participant_ID,
+		 		   reward) %>%
+		 	summarise(n_tasks = n()) %>%
+		 	ungroup() %>%
+		 	group_by(reward) %>%
+		 	summarise(min_n_tasks = min(n_tasks),
+		 		    max_n_tasks = max(n_tasks)))
+
+
+```
+
 For no-click tasks, the split between trials with 1, 2, or 3 differences is:
 
 ```{r}
@@ -94,11 +116,43 @@ knitr::kable(part_and_task_info %>%
 
 ```
 
+For no-click trials with three differences, the split by reward is:
+
+```{r}
+knitr::kable(part_and_task_info %>% 
+		 	filter(type_of_task == "noclick") %>% 
+		 	filter(n_differences == 3) %>%
+		 	group_by(reward) %>%
+		 	summarise(n_tasks = n()) %>%
+		 	ungroup() %>%
+		 	mutate(perc_tasks = n_tasks / sum(n_tasks)),
+		 digits = 2)
+
+```
+
+For trials with 1 or 2 differences, the split between normal and hard or very hard is:
+
+```{r}
+knitr::kable(part_and_task_info %>% 
+		 	filter(type_of_task == "noclick") %>% 
+		 	filter(n_differences %in% c(1, 2)) %>%
+		 	mutate(difficulty = if_else(reward %in% c(0.20, 0.40), "hard or very hard", "normal")) %>%
+		 	group_by(difficulty) %>%
+		 	summarise(n_tasks = n()) %>%
+		 	ungroup() %>%
+		 	mutate(perc_tasks = n_tasks / sum(n_tasks)),
+		 digits = 2)
+
+```
+
+
+
 # Results
 
 ## Plot % cheating in first half
 
 ```{r}
+
 df_plot <- part_and_task_info %>%
 	filter(type_of_task == "noclick") %>%
 	filter(n_differences %in% c(1, 2)) %>%
@@ -108,7 +162,9 @@ df_plot <- part_and_task_info %>%
 
 df_plot <- df_plot %>%
 	group_by(participant_ID) %>%
-	summarise(perc_cheating = sum(part_response == "Yes, found 3 diffs") / n()) %>%
+	summarise(n_tasks = n(),
+		    n_cheated = sum(part_response == "Yes, found 3 diffs"),
+		    perc_cheating = n_cheated / n_tasks) %>%
 	ungroup()
 
 mean_cheating <- mean(df_plot$perc_cheating)
@@ -132,21 +188,41 @@ df_plot <- df_plot %>%
 				     levels = c(0, 1),
 				     labels = c("bottom", "middle")))
 
-df_plot %>% 
+figure2 <- df_plot %>% 
 	ggplot(aes(x = cheat_number, y = perc_cheating)) +
-	geom_col(aes(fill = f_fill), width = 0.9, alpha = 0.50) +
+	geom_col(aes(fill = f_fill), width = 0.9) +
 	theme_bw() +
 	ylab("Percent cheating at t = 1") +
 	xlab("Participant") +
 	scale_x_continuous(breaks = c(1, 60, 120)) + 
 	scale_fill_manual("", 
 				breaks = c("bottom", "middle"),
-				values = c("middle" = "blue", # "#00A9FF"
-					     "bottom" = "grey50"),
+				values = c("middle" = "lightblue",
+					     "bottom" = "grey75"),
 				labels = c("bottom" = "Bottom 10% and top 10%",
-					     "middle" = "Analysis sample (n = 97)")) +
+					     "middle" = paste0("Analysis sample (n = ", 
+					     			nrow(df_plot %>%
+					     			     	filter(is_between_bottom_top_10perc == 1)),
+					     			")"))) +
 	guides(fill = guide_legend(nrow = 2)) +
 	theme(legend.position = "bottom") 
+
+figure2
+
+```
+
+
+```{r, echo = FALSE, include = FALSE}
+
+setEPS()
+postscript(here::here("figure2.eps"))
+figure2
+dev.off()
+
+png(filename = here::here("figure2.png"), 
+    width = 15, height = 10, units = "cm", res = 300)
+figure2
+dev.off()
 
 ```
 
@@ -154,59 +230,125 @@ The average percent cheating for the bottom 10% and top 10% is:
 
 ```{r}
 
-df_plot %>%
-	filter(is_between_bottom_top_10perc == 0) %>%
-	mutate(group_name = if_else(std_perc_cheating < 0, "bottom_10", "top_10")) %>%
-	group_by(group_name) %>%
-	summarise(n_obs = n(),
-		    mean_perc_cheating = mean(perc_cheating)) 
+knitr::kable(df_plot %>%
+		 	filter(is_between_bottom_top_10perc == 0) %>%
+		 	mutate(group_name = if_else(std_perc_cheating < 0, "bottom_10", "top_10")) %>%
+		 	group_by(group_name) %>%
+		 	summarise(n_obs = n(),
+		 		    mean_perc_cheating = mean(perc_cheating),
+		 		    mean_cheated = round(mean(n_cheated), 0),
+		 		    mean_tasks = round(mean(n_tasks), 0)),
+		 digits = 2)
+
 
 ```
 
 
+## Model estimation results
 
-## Model estimation results (n = 97)
+Exclude participants in the tom 10% and bottom 10%, based on cheating percentile.
 
 ```{r WO_top10_bottom10}
-WO_top10_bottom10_stan_data <- f_prep_stan_data(part_info = part_info, 
-								part_and_task_info = part_and_task_info,
-								exclusion_C1 = "no_exclusion", 
-								exclusion_C2 = "top_bottom_10")
+WO_top10_bottom10_df <- f_prep_use_tasks(part_info = part_info, 
+						     part_and_task_info = part_and_task_info,
+						     exclusion_C1 = "no_exclusion", 
+						     exclusion_C2 = "top_bottom_10")
+WO_top10_bottom10_stan_data <- f_prep_stan_data(use_tasks = WO_top10_bottom10_df[["use_tasks"]])
+
 WO_top10_bottom10_choice_fit <- sampling(choice_model, 
 						     data = WO_top10_bottom10_stan_data,
-						     chains = 2, 
-						     iter = 2000, 
+						     chains = n_chains, 
+						     iter = n_iter, 
 						     seed = 25,
 						     save_warmup = FALSE)
 ```
 
-`Rhat` values for this model:
+Check convergence (Rhat values should be 1):
 
 ```{r}
-summary(summary(WO_top10_bottom10_choice_fit)[["summary"]][, "Rhat"])
-```
 
-There are n = `r length(WO_top10_bottom10_stan_data[["X_in_stress_group"]])` participants, split between the control (n = `r length(WO_top10_bottom10_stan_data[["X_in_stress_group"]]) - sum((WO_top10_bottom10_stan_data[["X_in_stress_group"]]))`) and the stress (n = `r sum((WO_top10_bottom10_stan_data[["X_in_stress_group"]]))`) groups.
+summary(summary(WO_top10_bottom10_choice_fit)[["summary"]][, "Rhat"])
+
+```
 
 Estimation results are:
 
 ```{r}
 knitr::kable(f_sum_results(par_names = choice_pars, 
 				   stan_fit = WO_top10_bottom10_choice_fit), 
-		 digits = 2)
+		 digits = c(0, 2, 2, 3, 2, 2))
+
 ```
 
 Interaction plot:
 
 ```{r}
-f_plot_interaction(choice_fit = WO_top10_bottom10_choice_fit, 
-			 choice_pars = choice_pars, 
-			 grid_std_cheating = seq(
-			 	from = floor(min(WO_top10_bottom10_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-			 	to = ceiling(max(WO_top10_bottom10_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-			 	by = 0.01))
+
+figure3 <- f_plot_interaction_3in1(
+	choice_fit = WO_top10_bottom10_choice_fit, 
+	grid_std_cheating = seq(
+		from = floor(min(WO_top10_bottom10_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+		to = ceiling(max(WO_top10_bottom10_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+		by = 0.01),
+	mean_cheating = mean_cheating, 
+	sd_cheating = sd_cheating)
+figure3
 
 ```
+
+
+```{r, include = FALSE}
+setEPS()
+postscript(here::here("figure3.eps"))
+grid::grid.newpage()
+grid::grid.draw(figure3)
+dev.off()
+
+png(filename = here::here("figure3.png"), 
+    width = 15, height = 15, units = "cm", res = 300)
+grid::grid.newpage()
+grid::grid.draw(figure3)
+dev.off()
+
+```
+
+Mean and SD cheating, by group and block:
+
+```{r}
+
+knitr::kable(WO_top10_bottom10_df[["use_tasks"]] %>%
+		 	group_by(participant_ID,
+		 		   experimental_cond,
+		 		   study_half_number) %>%
+		 	summarise(perc_cheat = sum(is_cheating) / n()) %>%
+		 	ungroup() %>%
+		 	group_by(experimental_cond,
+		 		   study_half_number) %>%
+		 	summarise(n(),
+		 		    mean(perc_cheat),
+		 		    sd(perc_cheat)),
+		 digits = 2)
+
+
+```
+
+Check differences between control and stress in the percent of trials cheated during the first block.
+
+```{r}
+
+df_plot <- df_plot %>%
+	left_join(part_info %>%
+		    	select(participant_ID,
+		    		 experimental_cond),
+		    by = "participant_ID")
+
+aux_check <- lm(perc_cheating ~ experimental_cond,
+		    data = df_plot %>%
+		    	filter(is_between_bottom_top_10perc == 1))
+summary(aux_check)
+
+```
+
 
 
 # Results in Appendix
@@ -214,100 +356,141 @@ f_plot_interaction(choice_fit = WO_top10_bottom10_choice_fit,
 ## All participants (n = 120)
 
 ```{r allN}
-allN_stan_data <- f_prep_stan_data(part_info = part_info, 
-					     part_and_task_info = part_and_task_info,
-					     exclusion_C1 = "no_exclusion", 
-					     exclusion_C2 = "no_exclusion")
+
+allN_df <- f_prep_use_tasks(part_info = part_info, 
+				    part_and_task_info = part_and_task_info,
+				    exclusion_C1 = "no_exclusion", 
+				    exclusion_C2 = "no_exclusion")
+allN_stan_data <- f_prep_stan_data(use_tasks = allN_df[["use_tasks"]])
+
 allN_choice_fit <- sampling(choice_model, 
 				    data = allN_stan_data,
-				    chains = 2, 
-				    iter = 2000, 
+				    chains = n_chains, 
+				    iter = n_iter, 
 				    seed = 25,
 				    save_warmup = FALSE)
 ```
 
-`Rhat` values for this model:
+Check convergence (Rhat values should be 1):
 
 ```{r}
 summary(summary(allN_choice_fit)[["summary"]][, "Rhat"])
 ```
-
-There are n = `r length(allN_stan_data[["X_in_stress_group"]])` participants, split between the control (n = `r length(allN_stan_data[["X_in_stress_group"]]) - sum((allN_stan_data[["X_in_stress_group"]]))`) and the stress (n = `r sum((allN_stan_data[["X_in_stress_group"]]))`) groups.
 
 Estimation results are:
 
 ```{r}
 knitr::kable(f_sum_results(par_names = choice_pars, 
 				   stan_fit = allN_choice_fit), 
+		 digits = c(0, 2, 2, 3, 2, 2))
+```
+
+Mean and SD cheating, by group and block:
+
+```{r}
+knitr::kable(allN_df[["use_tasks"]] %>%
+		 	group_by(participant_ID,
+		 		   experimental_cond,
+		 		   study_half_number) %>%
+		 	summarise(perc_cheat = sum(is_cheating) / n()) %>%
+		 	ungroup() %>%
+		 	group_by(experimental_cond,
+		 		   study_half_number) %>%
+		 	summarise(n(),
+		 		    mean(perc_cheat),
+		 		    sd(perc_cheat)),
 		 digits = 2)
-```
-
-Interaction plot:
-
-```{r }
-f_plot_interaction(choice_fit = allN_choice_fit, 
-			 choice_pars = choice_pars, 
-			 grid_std_cheating = seq(
-			 	from = floor(min(allN_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-			 	to = ceiling(max(allN_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-			 	by = 0.01))
 
 ```
 
+Check differences between control and stress in the percent of trials cheated during the first block.
 
-## Exclude top 5% and bottom 5% (n = 108) 
+```{r}
+
+aux_check <- lm(perc_cheating ~ experimental_cond,
+		    data = df_plot)
+summary(aux_check)
+
+```
+
+
+
+## Exclude top 5% and bottom 5% 
 
 ```{r WO_top5_bottom5}
-WO_top5_bottom5_stan_data <- f_prep_stan_data(part_info = part_info, 
-							    part_and_task_info = part_and_task_info,
-							    exclusion_C1 = "no_exclusion", 
-							    exclusion_C2 = "top_bottom_5")
+WO_top5_bottom5_df <- f_prep_use_tasks(part_info = part_info, 
+						   part_and_task_info = part_and_task_info,
+						   exclusion_C1 = "no_exclusion", 
+						   exclusion_C2 = "top_bottom_5")
+WO_top5_bottom5_stan_data <- f_prep_stan_data(use_tasks = WO_top5_bottom5_df[["use_tasks"]])
 
 WO_top5_bottom5_choice_fit <- sampling(choice_model, 
 						   data = WO_top5_bottom5_stan_data,
-						   chains = 2, 
-						   iter = 2000, 
+						   chains = n_chains, 
+						   iter = n_iter, 
 						   seed = 25,
 						   save_warmup = FALSE)
 ```
 
-`Rhat` values for this model:
+Check convergence (Rhat values should be 1):
 
 ```{r}
 summary(summary(WO_top5_bottom5_choice_fit)[["summary"]][, "Rhat"])
 ```
-
-There are n = `r length(WO_top5_bottom5_stan_data[["X_in_stress_group"]])` participants, split between the control (n = `r length(WO_top5_bottom5_stan_data[["X_in_stress_group"]]) - sum((WO_top5_bottom5_stan_data[["X_in_stress_group"]]))`) and the stress (n = `r sum((WO_top5_bottom5_stan_data[["X_in_stress_group"]]))`) groups.
 
 Estimation results are:
 
 ```{r }
 knitr::kable(f_sum_results(par_names = choice_pars, 
 				   stan_fit = WO_top5_bottom5_choice_fit), 
+		 digits = c(0, 2, 2, 3, 2, 2))
+```
+
+Mean and SD cheating, by group and block:
+
+```{r}
+knitr::kable(WO_top5_bottom5_df[["use_tasks"]] %>%
+		 	group_by(participant_ID,
+		 		   experimental_cond,
+		 		   study_half_number) %>%
+		 	summarise(perc_cheat = sum(is_cheating) / n()) %>%
+		 	ungroup() %>%
+		 	group_by(experimental_cond,
+		 		   study_half_number) %>%
+		 	summarise(n(),
+		 		    mean(perc_cheat),
+		 		    sd(perc_cheat)),
 		 digits = 2)
-```
-
-Interaction plot:
-
-```{r }
-f_plot_interaction(choice_fit = WO_top5_bottom5_choice_fit, 
-			 choice_pars = choice_pars, 
-			 grid_std_cheating = seq(
-			 	from = floor(min(WO_top5_bottom5_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-			 	to = ceiling(max(WO_top5_bottom5_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-			 	by = 0.01))
 
 ```
 
 
-## Exclude top 15% and bottom 15% (n = 86)
+Check differences between control and stress in the percent of trials cheated during the first block.
+
+```{r}
+
+aux_df <- df_plot %>%
+	inner_join(WO_top5_bottom5_df[["use_participants"]] %>%
+		     	select(participant_ID),
+		     by = c("participant_ID"))
+
+aux_check <- lm(perc_cheating ~ experimental_cond,
+		    data = aux_df)
+summary(aux_check)
+
+```
+
+
+
+## Exclude top 15% and bottom 15%
 
 
 ```{r WO_top15_bottom15}
-WO_top15_bottom15_stan_data <- f_prep_stan_data(part_info = part_info, 
-								part_and_task_info = part_and_task_info,
-								exclusion_C1 = "no_exclusion", 
-								exclusion_C2 = "top_bottom_15")
+WO_top15_bottom15_df <- f_prep_use_tasks(part_info = part_info, 
+						     part_and_task_info = part_and_task_info,
+						     exclusion_C1 = "no_exclusion", 
+						     exclusion_C2 = "top_bottom_15")
+WO_top15_bottom15_stan_data <- f_prep_stan_data(use_tasks = WO_top15_bottom15_df[["use_tasks"]])
 
 WO_top15_bottom15_choice_fit <- sampling(choice_model, 
 						     data = WO_top15_bottom15_stan_data,
@@ -317,82 +500,204 @@ WO_top15_bottom15_choice_fit <- sampling(choice_model,
 						     save_warmup = FALSE)
 ```
 
-`Rhat` values for this model:
+Check convergence (Rhat values should be 1):
 
 ```{r}
 summary(summary(WO_top15_bottom15_choice_fit)[["summary"]][, "Rhat"])
 ```
-
-There are n = `r length(WO_top15_bottom15_stan_data[["X_in_stress_group"]])` participants, split between the control (n = `r length(WO_top15_bottom15_stan_data[["X_in_stress_group"]]) - sum((WO_top15_bottom15_stan_data[["X_in_stress_group"]]))`) and the stress (n = `r sum((WO_top15_bottom15_stan_data[["X_in_stress_group"]]))`) groups.
 
 Estimation results are:
 
 ```{r }
 knitr::kable(f_sum_results(par_names = choice_pars, 
 				   stan_fit = WO_top15_bottom15_choice_fit), 
+		 digits = c(0, 2, 2, 3, 2, 2))
+```
+
+Mean and SD cheating, by group and block:
+
+```{r}
+knitr::kable(WO_top15_bottom15_df[["use_tasks"]] %>%
+		 	group_by(participant_ID,
+		 		   experimental_cond,
+		 		   study_half_number) %>%
+		 	summarise(perc_cheat = sum(is_cheating) / n()) %>%
+		 	ungroup() %>%
+		 	group_by(experimental_cond,
+		 		   study_half_number) %>%
+		 	summarise(n(),
+		 		    mean(perc_cheat),
+		 		    sd(perc_cheat)),
 		 digits = 2)
-```
-
-Interaction plot:
-
-```{r }
-f_plot_interaction(choice_fit = WO_top15_bottom15_choice_fit, 
-			 choice_pars = choice_pars, 
-			 grid_std_cheating = seq(
-			 	from = floor(min(WO_top15_bottom15_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-			 	to = ceiling(max(WO_top15_bottom15_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-			 	by = 0.01))
 
 ```
 
-## Hand taken out (n = 114)
+Check differences between control and stress in the percent of trials cheated during the first block.
+
+```{r}
+
+aux_df <- df_plot %>%
+	inner_join(WO_top15_bottom15_df[["use_participants"]] %>%
+		     	select(participant_ID),
+		     by = c("participant_ID"))
+
+aux_check <- lm(perc_cheating ~ experimental_cond,
+		    data = aux_df)
+summary(aux_check)
+
+```
+
+
+
+## Hand taken out 
 
 ```{r WO_Hand_out}
-WO_Hand_out_stan_data <- f_prep_stan_data(part_info = part_info, 
-							part_and_task_info = part_and_task_info,
-							exclusion_C1 = "Hand_out", 
-							exclusion_C2 = "no_exclusion")
+WO_Hand_out_df <- f_prep_use_tasks(part_info = part_info, 
+					     part_and_task_info = part_and_task_info,
+					     exclusion_C1 = "Hand_out", 
+					     exclusion_C2 = "no_exclusion")
+WO_Hand_out_stan_data <- f_prep_stan_data(use_tasks = WO_Hand_out_df[["use_tasks"]])
 
 WO_Hand_out_choice_fit <- sampling(choice_model, 
 					     data = WO_Hand_out_stan_data,
-					     chains = 2, 
-					     iter = 2000, 
+					     chains = n_chains, 
+					     iter = n_iter, 
 					     seed = 25,
 					     save_warmup = FALSE)
 ```
 
-`Rhat` values for this model:
+Check convergence (Rhat values should be 1):
 
 ```{r}
 summary(summary(WO_Hand_out_choice_fit)[["summary"]][, "Rhat"])
 ```
-
-There are n = `r length(WO_Hand_out_stan_data[["X_in_stress_group"]])` participants, split between the control (n = `r length(WO_Hand_out_stan_data[["X_in_stress_group"]]) - sum((WO_Hand_out_stan_data[["X_in_stress_group"]]))`) and the stress (n = `r sum((WO_Hand_out_stan_data[["X_in_stress_group"]]))`) groups.
 
 Estimation results are:
 
 ```{r }
 knitr::kable(f_sum_results(par_names = choice_pars, 
 				   stan_fit = WO_Hand_out_choice_fit), 
-		 digits = 2)
+		 digits = c(0, 2, 2, 3, 2, 2))
 ```
 
-Interaction plot:
+Mean and SD cheating, by group and block:
+
+```{r}
+knitr::kable(WO_Hand_out_df[["use_tasks"]] %>%
+		 	group_by(participant_ID,
+		 		   experimental_cond,
+		 		   study_half_number) %>%
+		 	summarise(perc_cheat = sum(is_cheating) / n()) %>%
+		 	ungroup() %>%
+		 	group_by(experimental_cond,
+		 		   study_half_number) %>%
+		 	summarise(n(),
+		 		    mean(perc_cheat),
+		 		    sd(perc_cheat)),
+		 digits = 2)
+
+```
+
+Check differences between control and stress in the percent of trials cheated during the first block.
+
+```{r}
+
+aux_df <- df_plot %>%
+	inner_join(WO_Hand_out_df[["use_participants"]] %>%
+		     	select(participant_ID),
+		     by = c("participant_ID"))
+
+aux_check <- lm(perc_cheating ~ experimental_cond,
+		    data = aux_df)
+summary(aux_check)
+
+```
+
 
 ```{r }
-f_plot_interaction(choice_fit = WO_Hand_out_choice_fit, 
-			 choice_pars = choice_pars, 
-			 grid_std_cheating = seq(
-			 	from = floor(min(WO_Hand_out_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-			 	to = ceiling(max(WO_Hand_out_stan_data[["X_cheat_H1"]]) * 100) / 100, 
-			 	by = 0.01))
+
+plot_allN <- f_plot_interaction_single(
+	choice_fit = allN_choice_fit, 
+	grid_std_cheating = seq(
+		from = floor(min(allN_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+		to = ceiling(max(allN_stan_data[["X_cheat_H1"]]) * 100) / 100,
+		by = 0.01),
+	mean_cheating = mean_cheating,
+	sd_cheating = sd_cheating)
+
+plot_WO_top5_bottom5 <- f_plot_interaction_single(
+	choice_fit = WO_top5_bottom5_choice_fit, 
+	grid_std_cheating = seq(
+		from = floor(min(WO_top5_bottom5_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+		to = ceiling(max(WO_top5_bottom5_stan_data[["X_cheat_H1"]]) * 100) / 100,
+		by = 0.01),
+	mean_cheating = mean_cheating,
+	sd_cheating = sd_cheating)
+
+plot_WO_top15_bottom15 <- f_plot_interaction_single(
+	choice_fit = WO_top15_bottom15_choice_fit, 
+	grid_std_cheating = seq(
+		from = floor(min(WO_top15_bottom15_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+		to = ceiling(max(WO_top15_bottom15_stan_data[["X_cheat_H1"]]) * 100) / 100,
+		by = 0.01),
+	mean_cheating = mean_cheating,
+	sd_cheating = sd_cheating)
+
+plot_WO_hand_out <- f_plot_interaction_single(
+	choice_fit = WO_Hand_out_choice_fit, 
+	grid_std_cheating = seq(
+		from = floor(min(WO_Hand_out_stan_data[["X_cheat_H1"]]) * 100) / 100, 
+		to = ceiling(max(WO_Hand_out_stan_data[["X_cheat_H1"]]) * 100) / 100,
+		by = 0.01),
+	mean_cheating = mean_cheating,
+	sd_cheating = sd_cheating)
+
+plot_allN <- plot_allN + 
+	labs(title = paste0("a) n = ", nrow(allN_df[["use_participants"]]),
+				  "\n(full sample)"))
+plot_WO_top5_bottom5 <- plot_WO_top5_bottom5 + 
+	labs(title = paste0("b) n = ", nrow(WO_top5_bottom5_df[["use_participants"]]),
+				  " (excl. top and \n bottom 5%)"))
+plot_WO_top15_bottom15 <- plot_WO_top15_bottom15 + 
+	labs(title = paste0("c) n = ", nrow(WO_top15_bottom15_df[["use_participants"]]),
+				  " (excl. top and \n bottom 15%)"))
+plot_WO_hand_out <- plot_WO_hand_out + 
+	labs(title = paste0("d) n = ", nrow(WO_Hand_out_df[["use_participants"]]),
+				  " (excl. n = 6 \n who withdrew their hand)"))
+
+SM_plot <- ggpubr::ggarrange(plot_allN, 
+				     plot_WO_top5_bottom5,
+				     plot_WO_top15_bottom15, 
+				     plot_WO_hand_out,
+				     nrow = 2,
+				     ncol = 2,
+				     common.legend = TRUE,
+				     legend = "bottom")
+SM_plot
 
 ```
+
+
+```{r, include = FALSE}
+setEPS()
+postscript(here::here("figureSM.eps"))
+SM_plot
+dev.off()
+
+png(filename = here::here("figureSM.png"), 
+    width = 15, height = 15, units = "cm", res = 300)
+SM_plot
+dev.off()
+
+```
+
 
 # Info about R packages
 
 ```{r}
 sessionInfo()
 ```
+
+
 
 
